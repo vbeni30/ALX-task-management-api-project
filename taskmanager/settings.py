@@ -1,17 +1,19 @@
 """
 taskmanager/settings.py
 -----------------------
-Core Django settings for the Task Management API.
+Core Django settings for the Task Management API — Part 4.
 
-CHANGES FROM DEFAULT:
-  - Added 'rest_framework' and 'api' to INSTALLED_APPS
-  - Added REST_FRAMEWORK config block:
-      * DefaultAuthentication: SessionAuthentication + BasicAuthentication
-      * DefaultPermission:     IsAuthenticated  (all endpoints require login)
-  - ALLOWED_HOSTS left open for development; tighten before production
+CHANGES FROM PART 3:
+  - Added 'rest_framework_simplejwt' and 'django_filters' to INSTALLED_APPS
+  - Updated REST_FRAMEWORK config:
+      * Authentication: JWTAuthentication (primary) + SessionAuthentication (admin)
+      * Filter backends: DjangoFilterBackend, SearchFilter, OrderingFilter
+      * Pagination: PageNumberPagination with page_size=5
+  - Added SIMPLE_JWT config block with sensible token lifetimes
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # ---------------------------------------------------------------------------
 # Build paths
@@ -40,10 +42,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     # Third-party
-    "rest_framework",       # Django REST Framework
+    "rest_framework",               # Django REST Framework
+    "rest_framework_simplejwt",     # JWT Authentication
+    "django_filters",               # Advanced filtering
 
     # Local apps
-    "api",                  # Our Task Management app
+    "api",                          # Our Task Management app
 ]
 
 MIDDLEWARE = [
@@ -119,15 +123,50 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django REST Framework configuration
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
-    # Authentication: standard Django session + HTTP Basic Auth.
-    # JWT will be added in a later phase.
+    # Authentication: JWT is primary; SessionAuthentication kept for admin browsable API.
+    # BasicAuthentication removed — JWT replaces it for API clients.
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
 
     # All endpoints require an authenticated user by default.
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+
+    # Filter backends applied globally — views can further restrict these.
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+
+    # Pagination — 5 items per page by default; clients can override with ?page_size=N
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 5,
+}
+
+
+# ---------------------------------------------------------------------------
+# SimpleJWT configuration
+# ---------------------------------------------------------------------------
+SIMPLE_JWT = {
+    # Access token expires after 60 minutes — short-lived for security.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+
+    # Refresh token expires after 7 days — allows clients to stay logged in.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+
+    # Issue a new refresh token on each refresh call (sliding sessions).
+    "ROTATE_REFRESH_TOKENS": False,
+
+    # Blacklist old refresh tokens when rotated (requires simplejwt blacklist app).
+    "BLACKLIST_AFTER_ROTATION": False,
+
+    # Algorithm used to sign tokens — HS256 is the standard default.
+    "ALGORITHM": "HS256",
+
+    # Header type sent with the token: "Bearer <token>"
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }

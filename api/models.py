@@ -1,21 +1,57 @@
 """
 api/models.py
 -------------
-Defines the Task model — the core data entity for this API.
+Defines the data models for the Task Management API — Part 4.
+
+Models:
+  - Category: A user-owned label that can be attached to tasks.
+  - Task:     The core entity, now with an optional FK to Category.
 
 Design decisions:
-  - Uses Django's built-in User model via ForeignKey so we don't need
-    a custom user model in Part 3. This keeps things simple.
-  - completed_at stores the exact moment a task was marked done.
-    It is nullable because a PENDING task has no completion timestamp.
-  - Choices are defined as class-level constants (TextChoices) so they
-    are self-documenting and easy to extend later.
+  - Category.user and Task.user are always set from request.user in the view
+    (never accepted from the client) to guarantee isolation.
+  - Task.category is nullable so existing tasks need no migration data.
+  - completed_at is set/cleared by mark_complete/mark_incomplete helpers to
+    keep that logic in one place.
 """
 
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+
+# ---------------------------------------------------------------------------
+# Category
+# ---------------------------------------------------------------------------
+
+class Category(models.Model):
+    """A user-defined label that can be applied to tasks."""
+
+    # The user who owns this category.
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="categories",
+    )
+
+    # Category names are unique per user (enforced at serializer level too).
+    name = models.CharField(max_length=100)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} (owner: {self.user.username})"
+
+    class Meta:
+        ordering = ["name"]
+        # A user cannot have two categories with the same name.
+        unique_together = [("user", "name")]
+        verbose_name_plural = "categories"
+
+
+# ---------------------------------------------------------------------------
+# Task
+# ---------------------------------------------------------------------------
 
 class Task(models.Model):
     """Represents a single task owned by a user."""
@@ -45,6 +81,15 @@ class Task(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name="tasks",           # lets us do user.tasks.all()
+    )
+
+    # Optional category — null/blank so old tasks remain valid.
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks",
     )
 
     title = models.CharField(max_length=255)
