@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tasks — TaskFlow{% endblock %}
+{% block nav_tasks %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Tasks</h1>
+        <p class="page-subtitle" id="task-count-label">Loading…</p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        New Task
+    </button>
+</div>
+
+<div class="filter-bar">
+    <div class="filter-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input id="f-search" class="form-input" type="text" placeholder="Search tasks…">
+    </div>
+    <div class="filter-selects">
+        <select id="f-status" class="form-select filter-select-sm">
+            <option value="">All Status</option>
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+        </select>
+        <select id="f-priority" class="form-select filter-select-sm">
+            <option value="">All Priority</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+        </select>
+        <select id="f-category" class="form-select filter-select-sm">
+            <option value="">All Categories</option>
+        </select>
+        <select id="f-order" class="form-select filter-select-sm">
+            <option value="-created_at">Newest first</option>
+            <option value="created_at">Oldest first</option>
+            <option value="due_date">Due date ↑</option>
+            <option value="-due_date">Due date ↓</option>
+            <option value="priority">Priority</option>
+        </select>
+    </div>
+    <button class="btn btn-secondary" onclick="resetFilters()" style="flex-shrink:0">Reset</button>
+</div>
+
+<div id="task-list">
+    <div class="page-loader"><span class="spinner spinner-dark"></span></div>
+</div>
+
+<div class="pagination" id="pagination" style="display:none">
+    <button class="btn btn-secondary" id="pg-prev" onclick="changePage(-1)">← Prev</button>
+    <span class="pagination-info" id="pg-info"></span>
+    <button class="btn btn-secondary" id="pg-next" onclick="changePage(1)">Next →</button>
+</div>
+
+<!-- Create / Edit Modal -->
+<div class="modal-overlay" id="task-modal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2 class="modal-title" id="modal-title">New Task</h2>
+            <button class="modal-close" onclick="UI.close('task-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg></button>
+        </div>
+        <form id="task-form" novalidate>
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label class="form-label" for="task-form-title">Title *</label>
+                <input id="task-form-title" class="form-input" type="text" placeholder="Task title" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="task-form-desc">Description</label>
+                <textarea id="task-form-desc" class="form-textarea" placeholder="Optional description…"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="task-form-due">Due Date *</label>
+                    <input id="task-form-due" class="form-input" type="date" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="task-form-priority">Priority</label>
+                    <select id="task-form-priority" class="form-select">
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM" selected>Medium</option>
+                        <option value="HIGH">High</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label" for="task-form-cat">Category</label>
+                    <select id="task-form-cat" class="form-select">
+                        <option value="">No category</option>
+                    </select>
+                </div>
+                <div class="form-group" id="status-group" style="display:none">
+                    <label class="form-label" for="task-form-status">Status</label>
+                    <select id="task-form-status" class="form-select">
+                        <option value="PENDING">Pending</option>
+                        <option value="COMPLETED">Completed</option>
+                    </select>
+                </div>
+            </div>
+            <div id="form-error" class="form-error" style="display:none"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="UI.close('task-modal')">Cancel</button>
+                <button type="submit" id="save-btn" class="btn btn-primary">Create Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    requireAuth();
+
+    let currentPage = 1;
+    let totalPages = 1;
+    let categories = [];
+
+    function pBadge(p) { const m = { HIGH: 'badge-high', MEDIUM: 'badge-medium', LOW: 'badge-low' }; return `<span class="badge ${m[p] || 'badge-medium'}">${p}</span>`; }
+    function sBadge(s) { return `<span class="badge ${s === 'COMPLETED' ? 'badge-completed' : 'badge-pending'}">${s}</span>`; }
+    function dBadge(d, s) {
+        if (!d) return '';
+        const ov = s !== 'COMPLETED' && isOverdue(d);
+        return `<span class="badge ${ov ? 'badge-overdue' : 'badge-date'}">${ov ? 'Overdue · ' : ''}${fmtDate(d)}</span>`;
+    }
+
+    async function loadCategories() {
+        try {
+            const r = await API.get('/api/categories/', { page_size: 100 });
+            categories = r.results || [];
+            const opts = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            document.getElementById('f-category').innerHTML += opts;
+            document.getElementById('task-form-cat').innerHTML = '<option value="">No category</option>' + opts;
+        } catch { }
+    }
+
+    async function loadTasks() {
+        const listEl = document.getElementById('task-list');
+        listEl.innerHTML = '<div class="page-loader"><span class="spinner spinner-dark"></span></div>';
+
+        const params = {
+            page: currentPage,
+            page_size: 10,
+            search: document.getElementById('f-search').value.trim(),
+            status: document.getElementById('f-status').value,
+            priority: document.getElementById('f-priority').value,
+            category: document.getElementById('f-category').value,
+            ordering: document.getElementById('f-order').value,
+        };
+
+        try {
+            const data = await API.get('/api/tasks/', params);
+            const tasks = data.results || [];
+            totalPages = Math.ceil((data.count || 0) / 10) || 1;
+
+            document.getElementById('task-count-label').textContent =
+                data.count === 0 ? 'No tasks found'
+                    : data.count === 1 ? '1 task'
+                        : `${data.count} tasks`;
+
+            if (!tasks.length) {
+                listEl.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tasks found</div><div class="empty-desc">Try adjusting your filters or create a new task.</div></div>`;
+                showPagination(data.count);
+                return;
+            }
+
+            listEl.innerHTML = `<div class="task-list">${tasks.map(renderTask).join('')}</div>`;
+            showPagination(data.count);
+        } catch (e) {
+            listEl.innerHTML = `<p style="color:var(--danger);padding:16px">Failed to load tasks — ${apiErr(e)}</p>`;
+        }
+    }
+
+    function renderTask(t) {
+        const completed = t.status === 'COMPLETED';
+        return `
+  <div class="task-card ${completed ? 'completed' : ''}" id="tc-${t.id}">
+    <button class="task-toggle" onclick="toggle(${t.id})" title="${completed ? 'Mark pending' : 'Mark complete'}">${completed ? '✓' : ''}</button>
+    <div class="task-body">
+      <div class="task-title">${escHtml(t.title)}</div>
+      ${t.description ? `<div class="task-desc">${escHtml(t.description)}</div>` : ''}
+      <div class="task-meta">
+        ${pBadge(t.priority)}
+        ${sBadge(t.status)}
+        ${dBadge(t.due_date, t.status)}
+        ${t.category_name ? `<span class="badge badge-category">${escHtml(t.category_name)}</span>` : ''}
+      </div>
+    </div>
+    <div class="task-actions">
+      <button class="icon-btn accent" onclick="openEdit(${JSON.stringify(t).replace(/"/g, '&quot;')})" title="Edit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="icon-btn danger" onclick="deleteTask(${t.id},'${escHtml(t.title)}')" title="Delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+    </div>
+  </div>`;
+    }
+
+    function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+    function showPagination(count) {
+        const pg = document.getElementById('pagination');
+        if (count <= 10) { pg.style.display = 'none'; return; }
+        pg.style.display = 'flex';
+        document.getElementById('pg-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById('pg-prev').disabled = currentPage <= 1;
+        document.getElementById('pg-next').disabled = currentPage >= totalPages;
+    }
+
+    function changePage(dir) { currentPage = Math.max(1, Math.min(totalPages, currentPage + dir)); loadTasks(); }
+
+    function resetFilters() {
+        ['f-search', 'f-status', 'f-priority', 'f-category'].forEach(id => { const el = document.getElementById(id); if (el.tagName === 'INPUT') el.value = ''; else el.value = ''; });
+        document.getElementById('f-order').value = '-created_at';
+        currentPage = 1; loadTasks();
+    }
+
+    async function toggle(id) {
+        try {
+            const t = await API.patch(`/api/tasks/${id}/toggle/`);
+            UI.toast(t.status === 'COMPLETED' ? 'Task completed' : 'Task marked pending', 'success');
+            loadTasks();
+        } catch (e) { UI.toast(apiErr(e), 'error'); }
+    }
+
+    async function deleteTask(id, title) {
+        if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+        try {
+            await API.del(`/api/tasks/${id}/`);
+            UI.toast('Task deleted', 'info');
+            loadTasks();
+        } catch (e) { UI.toast(apiErr(e), 'error'); }
+    }
+
+    function openCreate() {
+        document.getElementById('edit-id').value = '';
+        document.getElementById('modal-title').textContent = 'New Task';
+        document.getElementById('save-btn').textContent = 'Create Task';
+        document.getElementById('task-form').reset();
+        document.getElementById('status-group').style.display = 'none';
+        document.getElementById('form-error').style.display = 'none';
+        document.getElementById('task-form-priority').value = 'MEDIUM';
+        UI.open('task-modal');
+        setTimeout(() => document.getElementById('task-form-title').focus(), 100);
+    }
+
+    function openEdit(t) {
+        document.getElementById('edit-id').value = t.id;
+        document.getElementById('modal-title').textContent = 'Edit Task';
+        document.getElementById('save-btn').textContent = 'Save Changes';
+        document.getElementById('task-form-title').value = t.title;
+        document.getElementById('task-form-desc').value = t.description || '';
+        document.getElementById('task-form-due').value = t.due_date || '';
+        document.getElementById('task-form-priority').value = t.priority;
+        document.getElementById('task-form-cat').value = t.category || '';
+        document.getElementById('task-form-status').value = t.status;
+        document.getElementById('status-group').style.display = '';
+        document.getElementById('form-error').style.display = 'none';
+        UI.open('task-modal');
+    }
+
+    document.getElementById('task-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('save-btn');
+        const errEl = document.getElementById('form-error');
+        errEl.style.display = 'none';
+
+        const id = document.getElementById('edit-id').value;
+        const title = document.getElementById('task-form-title').value.trim();
+        const due = document.getElementById('task-form-due').value;
+        if (!title) { errEl.textContent = 'Title is required.'; errEl.style.display = 'block'; return; }
+        if (!due) { errEl.textContent = 'Due date is required.'; errEl.style.display = 'block'; return; }
+
+        const payload = {
+            title, due_date: due,
+            description: document.getElementById('task-form-desc').value.trim(),
+            priority: document.getElementById('task-form-priority').value,
+            category: document.getElementById('task-form-cat').value || null,
+        };
+        if (id) payload.status = document.getElementById('task-form-status').value;
+
+        UI.loading(btn, true);
+        try {
+            if (id) { await API.patch(`/api/tasks/${id}/`, payload); UI.toast('Task updated', 'success'); }
+            else { await API.post('/api/tasks/', payload); UI.toast('Task created', 'success'); }
+            UI.loading(btn, false);
+            UI.close('task-modal');
+            loadTasks();
+        } catch (err) {
+            errEl.textContent = apiErr(err); errEl.style.display = 'block';
+            UI.loading(btn, false);
+        }
+    });
+
+    ['f-search', 'f-status', 'f-priority', 'f-category', 'f-order'].forEach(id => {
+        const el = document.getElementById(id);
+        const ev = el.tagName === 'INPUT' ? 'input' : 'change';
+        el.addEventListener(ev, () => { currentPage = 1; loadTasks(); });
+    });
+
+    loadCategories();
+    loadTasks();
+    if (window.location.hash === '#new') {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        openCreate();
+    }
+</script>
+{% endblock %}

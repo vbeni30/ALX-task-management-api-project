@@ -1,0 +1,101 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account — TaskFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                </div>
+                <span class="auth-brand-name">TaskFlow</span>
+            </div>
+
+            <h1 class="auth-title">Create account</h1>
+            <p class="auth-subtitle">Get started — it's free</p>
+
+            <form id="reg-form" novalidate>
+                <div class="form-group">
+                    <label class="form-label" for="reg-username">Username</label>
+                    <input id="reg-username" class="form-input" type="text" placeholder="Choose a username"
+                        autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-email">Email <span
+                            style="opacity:.5;font-weight:400">(optional)</span></label>
+                    <input id="reg-email" class="form-input" type="email" placeholder="you@example.com"
+                        autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-password">Password</label>
+                    <input id="reg-password" class="form-input" type="password" placeholder="Min. 8 characters"
+                        autocomplete="new-password" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-confirm">Confirm Password</label>
+                    <input id="reg-confirm" class="form-input" type="password" placeholder="Repeat your password"
+                        autocomplete="new-password" required>
+                    <div id="reg-error" class="form-error" style="display:none"></div>
+                </div>
+                <button id="reg-btn" class="btn btn-primary btn-full" type="submit">Create Account</button>
+            </form>
+
+            <p class="auth-footer">Already have an account? <a href="/">Sign in</a></p>
+        </div>
+    </div>
+    <script src="{% static 'js/app.js' %}"></script>
+    <script>
+        guestOnly();
+
+        document.getElementById('reg-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const btn = document.getElementById('reg-btn');
+            const errEl = document.getElementById('reg-error');
+            errEl.style.display = 'none';
+
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
+
+            if (!username || !password) {
+                errEl.textContent = 'Username and password are required.'; errEl.style.display = 'block'; return;
+            }
+            if (password.length < 8) {
+                errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return;
+            }
+            if (password !== confirm) {
+                errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return;
+            }
+
+            UI.loading(btn, true);
+            try {
+                await API.post('/api/register/', { username, email, password });
+                // Auto-login after registration
+                const tokens = await API.post('/api/token/', { username, password });
+                Auth.set(tokens.access, tokens.refresh, username);
+                UI.toast('Account created! Welcome, ' + username + ' 🎉', 'success');
+                window.location.href = '/dashboard/';
+            } catch (err) {
+                errEl.textContent = apiErr(err);
+                errEl.style.display = 'block';
+                UI.loading(btn, false);
+            }
+        });
+    </script>
+</body>
+
+</html>

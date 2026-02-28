@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dashboard — TaskFlow{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title" id="welcome-title">Dashboard</h1>
+        <p class="page-subtitle">Here's what's happening with your tasks</p>
+    </div>
+    <a href="/tasks/#new" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        New Task
+    </a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <polyline points="9 11 12 14 22 4" />
+            </svg></div>
+        <div class="stat-value" id="s-total">—</div>
+        <div class="stat-label">Total Tasks</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12" />
+            </svg></div>
+        <div class="stat-value" id="s-done">—</div>
+        <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+            </svg></div>
+        <div class="stat-value" id="s-pending">—</div>
+        <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+            </svg></div>
+        <div class="stat-value" id="s-cats">—</div>
+        <div class="stat-label">Categories</div>
+    </div>
+</div>
+
+<!-- High priority pending -->
+<div class="section" id="urgent-section" style="display:none">
+    <div class="section-header">
+        <span class="section-title">High priority pending</span>
+        <a href="/tasks/?priority=HIGH&status=PENDING" class="section-link">View all →</a>
+    </div>
+    <div class="task-list" id="urgent-list"></div>
+</div>
+
+<!-- Recent tasks -->
+<div class="section">
+    <div class="section-header">
+        <span class="section-title">Recent tasks</span>
+        <a href="/tasks/" class="section-link">View all →</a>
+    </div>
+    <div id="recent-list">
+        <div class="page-loader"><span class="spinner spinner-dark"></span></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    requireAuth();
+
+    document.getElementById('welcome-title').textContent = 'Hello, ' + Auth.getUsername();
+
+    function priorityBadge(p) {
+        const map = { HIGH: 'badge-high', MEDIUM: 'badge-medium', LOW: 'badge-low' };
+        return `<span class="badge ${map[p] || 'badge-medium'}">${p}</span>`;
+    }
+    function statusBadge(s) {
+        return `<span class="badge ${s === 'COMPLETED' ? 'badge-completed' : 'badge-pending'}">${s}</span>`;
+    }
+    function dateBadge(d, status) {
+        if (!d) return '';
+        const over = status !== 'COMPLETED' && isOverdue(d);
+        return `<span class="badge ${over ? 'badge-overdue' : 'badge-date'}">${over ? 'Overdue · ' : ''}${fmtDate(d)}</span>`;
+    }
+
+    function taskCard(t) {
+        const completed = t.status === 'COMPLETED';
+        return `
+    <div class="task-card ${completed ? 'completed' : ''}">
+      <div style="flex:1;min-width:0">
+        <div class="task-title">${t.title}</div>
+        <div class="task-meta">
+          ${priorityBadge(t.priority)}
+          ${statusBadge(t.status)}
+          ${dateBadge(t.due_date, t.status)}
+          ${t.category_name ? `<span class="badge badge-category">${t.category_name}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+    }
+
+    async function load() {
+        try {
+            const [tasks, cats] = await Promise.all([
+                API.get('/api/tasks/', { page_size: 100 }),
+                API.get('/api/categories/', { page_size: 100 }),
+            ]);
+
+            const all = tasks.results || [];
+            const catCount = (cats.results || []).length;
+            const done = all.filter(t => t.status === 'COMPLETED').length;
+            const pending = all.filter(t => t.status === 'PENDING').length;
+
+            document.getElementById('s-total').textContent = all.length;
+            document.getElementById('s-done').textContent = done;
+            document.getElementById('s-pending').textContent = pending;
+            document.getElementById('s-cats').textContent = catCount;
+
+            const urgent = all.filter(t => t.status === 'PENDING' && t.priority === 'HIGH').slice(0, 3);
+            if (urgent.length) {
+                document.getElementById('urgent-section').style.display = '';
+                document.getElementById('urgent-list').innerHTML = urgent.map(taskCard).join('');
+            }
+
+            const recent = all.slice(0, 5);
+            const recentEl = document.getElementById('recent-list');
+            if (!recent.length) {
+                recentEl.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No tasks yet</div><div class="empty-desc">Create your first task to get started.</div><a href="/tasks/#new" class="btn btn-primary">Create a task</a></div>`;
+            } else {
+                recentEl.innerHTML = `<div class="task-list">${recent.map(taskCard).join('')}</div>`;
+            }
+        } catch (e) {
+            document.getElementById('recent-list').innerHTML = `<p style="color:var(--danger);padding:16px">Failed to load tasks.</p>`;
+        }
+    }
+
+    load();
+</script>
+{% endblock %}

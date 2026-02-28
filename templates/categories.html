@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Categories — TaskFlow{% endblock %}
+{% block nav_categories %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Categories</h1>
+        <p class="page-subtitle" id="cat-count-label">Organize your tasks into groups</p>
+    </div>
+    <button class="btn btn-primary" onclick="openCreate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        New Category
+    </button>
+</div>
+
+<div class="filter-bar" style="margin-bottom:20px">
+    <div class="filter-search" style="max-width:340px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input id="cat-search" class="form-input" type="text" placeholder="Search categories…">
+    </div>
+</div>
+
+<div id="cat-grid">
+    <div class="page-loader"><span class="spinner spinner-dark"></span></div>
+</div>
+
+<!-- Create / Edit Modal -->
+<div class="modal-overlay" id="cat-modal">
+    <div class="modal-box" style="max-width:420px">
+        <div class="modal-head">
+            <h2 class="modal-title" id="cat-modal-title">New Category</h2>
+            <button class="modal-close" onclick="UI.close('cat-modal')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+            </svg></button>
+        </div>
+        <form id="cat-form" novalidate>
+            <input type="hidden" id="cat-edit-id">
+            <div class="form-group">
+                <label class="form-label" for="cat-form-name">Category Name *</label>
+                <input id="cat-form-name" class="form-input" type="text" placeholder="e.g. Work, Personal, Health…" required>
+            </div>
+            <div id="cat-form-error" class="form-error" style="display:none"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="UI.close('cat-modal')">Cancel</button>
+                <button type="submit" id="cat-save-btn" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    requireAuth();
+
+    const COLORS = ['#d97706', '#10b981', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6', '#f97316', '#ec4899'];
+    let colorIdx = 0;
+
+    function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    async function loadCategories() {
+        const grid = document.getElementById('cat-grid');
+        const search = document.getElementById('cat-search').value.trim();
+
+        try {
+            const data = await API.get('/api/categories/', { search, page_size: 100 });
+            const cats = data.results || [];
+
+            document.getElementById('cat-count-label').textContent =
+                cats.length === 0 ? 'No categories yet'
+                    : cats.length === 1 ? '1 category' : `${cats.length} categories`;
+
+            if (!cats.length) {
+                grid.innerHTML = `<div class="empty"><div class="empty-icon">🏷️</div><div class="empty-title">No categories yet</div><div class="empty-desc">${search ? 'No categories match your search.' : 'Create categories to organize your tasks.'}</div></div>`;
+                return;
+            }
+
+            let taskData = { results: [] };
+            try { taskData = await API.get('/api/tasks/', { page_size: 500 }); } catch { }
+            const tasks = taskData.results || [];
+
+            colorIdx = 0;
+            grid.innerHTML = `<div class="cat-grid">${cats.map(c => renderCat(c, tasks)).join('')}</div>`;
+        } catch (e) {
+            grid.innerHTML = `<p style="color:var(--danger);padding:16px">Failed to load — ${apiErr(e)}</p>`;
+        }
+    }
+
+    function renderCat(c, tasks) {
+        const color = COLORS[colorIdx++ % COLORS.length];
+        const taskCount = tasks.filter(t => t.category === c.id).length;
+        const pendingCount = tasks.filter(t => t.category === c.id && t.status === 'PENDING').length;
+        const nameAttr = escHtml(c.name).replace(/"/g, '&quot;');
+        return `
+  <div class="cat-card" data-cat-id="${c.id}" data-cat-name="${nameAttr}">
+    <div class="cat-dot" style="background:${color}"></div>
+    <div class="cat-name">${escHtml(c.name)}</div>
+    <div class="cat-count">${taskCount} task${taskCount !== 1 ? 's' : ''} · ${pendingCount} pending</div>
+    <div class="cat-actions">
+      <button class="icon-btn accent" onclick="openEditFromCard(this.closest('.cat-card'))" title="Edit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
+      <button class="icon-btn danger" onclick="deleteCatFromCard(this.closest('.cat-card'))" title="Delete">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+    </div>
+  </div>`;
+    }
+
+    function openEditFromCard(card) {
+        const id = card.getAttribute('data-cat-id');
+        const name = card.getAttribute('data-cat-name').replace(/&quot;/g, '"');
+        openEdit(id, name);
+    }
+
+    function deleteCatFromCard(card) {
+        const id = card.getAttribute('data-cat-id');
+        const name = card.getAttribute('data-cat-name').replace(/&quot;/g, '"');
+        deleteCat(id, name);
+    }
+
+    function openCreate() {
+        document.getElementById('cat-edit-id').value = '';
+        document.getElementById('cat-modal-title').textContent = 'New Category';
+        document.getElementById('cat-save-btn').textContent = 'Create';
+        document.getElementById('cat-form-name').value = '';
+        document.getElementById('cat-form-error').style.display = 'none';
+        UI.open('cat-modal');
+        setTimeout(() => document.getElementById('cat-form-name').focus(), 100);
+    }
+
+    function openEdit(id, name) {
+        document.getElementById('cat-edit-id').value = id;
+        document.getElementById('cat-modal-title').textContent = 'Edit Category';
+        document.getElementById('cat-save-btn').textContent = 'Save Changes';
+        document.getElementById('cat-form-name').value = name;
+        document.getElementById('cat-form-error').style.display = 'none';
+        UI.open('cat-modal');
+        setTimeout(() => document.getElementById('cat-form-name').focus(), 100);
+    }
+
+    document.getElementById('cat-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('cat-save-btn');
+        const errEl = document.getElementById('cat-form-error');
+        errEl.style.display = 'none';
+
+        const id = document.getElementById('cat-edit-id').value;
+        const name = document.getElementById('cat-form-name').value.trim();
+        if (!name) { errEl.textContent = 'Category name is required.'; errEl.style.display = 'block'; return; }
+
+        UI.loading(btn, true);
+        try {
+            if (id) { await API.patch(`/api/categories/${id}/`, { name }); UI.toast('Category updated', 'success'); }
+            else { await API.post('/api/categories/', { name }); UI.toast('Category created', 'success'); }
+            UI.loading(btn, false);
+            UI.close('cat-modal');
+            loadCategories();
+        } catch (err) {
+            errEl.textContent = apiErr(err); errEl.style.display = 'block';
+            UI.loading(btn, false);
+        }
+    });
+
+    async function deleteCat(id, name) {
+        if (!confirm(`Delete category "${name}"?\n\nTasks in this category will not be deleted, but will become uncategorized.`)) return;
+        try {
+            await API.del(`/api/categories/${id}/`);
+            UI.toast('Category deleted', 'info');
+            loadCategories();
+        } catch (e) { UI.toast(apiErr(e), 'error'); }
+    }
+
+    document.getElementById('cat-search').addEventListener('input', () => loadCategories());
+    loadCategories();
+</script>
+{% endblock %}

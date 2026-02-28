@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — TaskFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+
+<body>
+    <div class="auth-page">
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="auth-brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                </div>
+                <span class="auth-brand-name">TaskFlow</span>
+            </div>
+
+            <h1 class="auth-title">Welcome back</h1>
+            <p class="auth-subtitle">Sign in to manage your tasks</p>
+
+            <form id="login-form" novalidate>
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input id="username" class="form-input" type="text" placeholder="Enter your username"
+                        autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input id="password" class="form-input" type="password" placeholder="Enter your password"
+                        autocomplete="current-password" required>
+                    <div id="login-error" class="form-error" style="display:none"></div>
+                </div>
+                <button id="login-btn" class="btn btn-primary btn-full" type="submit">Sign In</button>
+            </form>
+
+            <p class="auth-footer">Don't have an account? <a href="/register/">Create one</a></p>
+        </div>
+    </div>
+    <script src="{% static 'js/app.js' %}"></script>
+    <script>
+        guestOnly();
+
+        document.getElementById('login-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const errEl = document.getElementById('login-error');
+            errEl.style.display = 'none';
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            if (!username || !password) {
+                errEl.textContent = 'Please enter your username and password.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            UI.loading(btn, true);
+            try {
+                const data = await API.post('/api/token/', { username, password });
+                Auth.set(data.access, data.refresh, username);
+                window.location.href = '/dashboard/';
+            } catch (err) {
+                errEl.textContent = apiErr(err);
+                errEl.style.display = 'block';
+                UI.loading(btn, false);
+            }
+        });
+
+        // Allow Enter key on both fields
+        ['username', 'password'].forEach(id => {
+            document.getElementById(id).addEventListener('keydown', e => {
+                if (e.key === 'Enter') document.getElementById('login-form').requestSubmit();
+            });
+        });
+    </script>
+</body>
+
+</html>

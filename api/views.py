@@ -16,13 +16,13 @@ Key design decisions:
 """
 
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, status, viewsets
+from rest_framework import filters, generics, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Category, Task
-from .serializers import CategorySerializer, TaskSerializer
+from .serializers import CategorySerializer, TaskSerializer, UserRegisterSerializer
 
 
 # ---------------------------------------------------------------------------
@@ -145,3 +145,28 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(task)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# User Registration (public)
+# ---------------------------------------------------------------------------
+
+class RegisterView(generics.CreateAPIView):
+    """
+    POST /api/register/
+
+    Public endpoint — creates a new user account.
+    Returns the new username on success (password is write-only).
+    """
+
+    serializer_class = UserRegisterSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(
+            {"message": "Account created successfully.", "username": user.username},
+            status=status.HTTP_201_CREATED,
+        )

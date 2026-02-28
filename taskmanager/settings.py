@@ -1,15 +1,18 @@
 """
 taskmanager/settings.py
 -----------------------
-Core Django settings for the Task Management API — Part 4.
+Core Django settings for the Task Management API.
 
-CHANGES FROM PART 3:
-  - Added 'rest_framework_simplejwt' and 'django_filters' to INSTALLED_APPS
-  - Updated REST_FRAMEWORK config:
-      * Authentication: JWTAuthentication (primary) + SessionAuthentication (admin)
-      * Filter backends: DjangoFilterBackend, SearchFilter, OrderingFilter
-      * Pagination: PageNumberPagination with page_size=5
-  - Added SIMPLE_JWT config block with sensible token lifetimes
+Key configurations:
+  - REST_FRAMEWORK: JWT authentication, global filter backends, pagination
+  - SIMPLE_JWT: Token lifetimes, algorithm, header type
+  - DATABASES: SQLite for development (swap to PostgreSQL for production)
+
+Production checklist:
+  - Set SECRET_KEY from an environment variable (never commit the real key).
+  - Set DEBUG=False.
+  - Restrict ALLOWED_HOSTS to your domain(s).
+  - Switch DATABASE to PostgreSQL or another production-grade engine.
 """
 
 from pathlib import Path
@@ -65,7 +68,7 @@ ROOT_URLCONF = "taskmanager.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -116,6 +119,7 @@ USE_TZ = True
 # Static files
 # ---------------------------------------------------------------------------
 STATIC_URL = "static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
@@ -142,9 +146,12 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ],
 
-    # Pagination — 5 items per page by default; clients can override with ?page_size=N
+    # Pagination — 10 items per page by default.
+    # Clients can override with ?page_size=N (capped at MAX_PAGE_SIZE=100).
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 5,
+    "PAGE_SIZE": 10,
+    "PAGE_SIZE_QUERY_PARAM": "page_size",  # allow ?page_size=N
+    "MAX_PAGE_SIZE": 100,                  # prevent abuse
 }
 
 
@@ -158,10 +165,10 @@ SIMPLE_JWT = {
     # Refresh token expires after 7 days — allows clients to stay logged in.
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 
-    # Issue a new refresh token on each refresh call (sliding sessions).
-    "ROTATE_REFRESH_TOKENS": False,
-
-    # Blacklist old refresh tokens when rotated (requires simplejwt blacklist app).
+    # Issue a new refresh token on each refresh — invalidates the old one.
+    # Enable BLACKLIST_AFTER_ROTATION (and add 'rest_framework_simplejwt.token_blacklist'
+    # to INSTALLED_APPS) in production to fully revoke old refresh tokens.
+    "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": False,
 
     # Algorithm used to sign tokens — HS256 is the standard default.
@@ -169,4 +176,8 @@ SIMPLE_JWT = {
 
     # Header type sent with the token: "Bearer <token>"
     "AUTH_HEADER_TYPES": ("Bearer",),
+
+    # JWT claim containing the user's primary key.
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
 }
