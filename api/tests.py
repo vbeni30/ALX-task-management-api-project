@@ -1,20 +1,3 @@
-"""
-api/tests.py
-------------
-Basic test suite for the Task Management API.
-
-Covers:
-  - Unit tests for Category and Task model methods (__str__, mark_complete,
-    mark_incomplete).
-  - API integration tests for Task and Category endpoints:
-      * Authentication enforcement (unauthenticated requests rejected).
-      * User isolation (users cannot see each other's data).
-      * Core CRUD operations and the toggle endpoint.
-
-Run with:
-    python manage.py test api
-"""
-
 from datetime import date
 
 from django.contrib.auth.models import User
@@ -26,9 +9,8 @@ from rest_framework.test import APIClient, APITestCase
 from .models import Category, Task
 
 
-# ===========================================================================
+
 # Unit tests — model logic
-# ===========================================================================
 
 class CategoryModelTest(TestCase):
     """Unit tests for the Category model."""
@@ -101,9 +83,8 @@ class TaskModelTest(TestCase):
         self.assertEqual(tasks[0].pk, t2.pk)
 
 
-# ===========================================================================
+
 # API integration tests
-# ===========================================================================
 
 class AuthEnforcementTest(APITestCase):
     """Unauthenticated requests must be rejected with 401."""
