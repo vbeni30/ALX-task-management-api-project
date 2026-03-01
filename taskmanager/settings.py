@@ -1,40 +1,15 @@
-"""
-taskmanager/settings.py
------------------------
-Core Django settings for the Task Management API.
-
-Key configurations:
-  - REST_FRAMEWORK: JWT authentication, global filter backends, pagination
-  - SIMPLE_JWT: Token lifetimes, algorithm, header type
-  - DATABASES: SQLite for development (swap to PostgreSQL for production)
-
-Production checklist:
-  - Set SECRET_KEY from an environment variable (never commit the real key).
-  - Set DEBUG=False.
-  - Restrict ALLOWED_HOSTS to your domain(s).
-  - Switch DATABASE to PostgreSQL or another production-grade engine.
-"""
-
 from pathlib import Path
 from datetime import timedelta
 
-# ---------------------------------------------------------------------------
-# Build paths
-# ---------------------------------------------------------------------------
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# ---------------------------------------------------------------------------
-# SECURITY — change SECRET_KEY and DEBUG before deploying!
-# ---------------------------------------------------------------------------
 SECRET_KEY = "django-insecure-change-me-before-production"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
-
-# ---------------------------------------------------------------------------
 # Application definition
-# ---------------------------------------------------------------------------
+
 INSTALLED_APPS = [
     # Django built-ins
     "django.contrib.admin",
@@ -45,12 +20,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     # Third-party
-    "rest_framework",               # Django REST Framework
-    "rest_framework_simplejwt",     # JWT Authentication
-    "django_filters",               # Advanced filtering
+    "rest_framework",              
+    "rest_framework_simplejwt",    
+    "django_filters",               
 
     # Local apps
-    "api",                          # Our Task Management app
+    "api",                          # My Task Management app
 ]
 
 MIDDLEWARE = [
@@ -84,9 +59,8 @@ TEMPLATES = [
 WSGI_APPLICATION = "taskmanager.wsgi.application"
 
 
-# ---------------------------------------------------------------------------
+
 # Database — SQLite for development; swap to PostgreSQL for production
-# ---------------------------------------------------------------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -95,9 +69,8 @@ DATABASES = {
 }
 
 
-# ---------------------------------------------------------------------------
 # Password validation
-# ---------------------------------------------------------------------------
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -106,26 +79,23 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# ---------------------------------------------------------------------------
 # Internationalization
-# ---------------------------------------------------------------------------
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
 
-# ---------------------------------------------------------------------------
 # Static files
-# ---------------------------------------------------------------------------
+
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-# ---------------------------------------------------------------------------
+
 # Django REST Framework configuration
-# ---------------------------------------------------------------------------
+
 REST_FRAMEWORK = {
     # Authentication: JWT is primary; SessionAuthentication kept for admin browsable API.
     # BasicAuthentication removed — JWT replaces it for API clients.
@@ -155,9 +125,9 @@ REST_FRAMEWORK = {
 }
 
 
-# ---------------------------------------------------------------------------
+
 # SimpleJWT configuration
-# ---------------------------------------------------------------------------
+
 SIMPLE_JWT = {
     # Access token expires after 60 minutes — short-lived for security.
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
@@ -165,9 +135,6 @@ SIMPLE_JWT = {
     # Refresh token expires after 7 days — allows clients to stay logged in.
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 
-    # Issue a new refresh token on each refresh — invalidates the old one.
-    # Enable BLACKLIST_AFTER_ROTATION (and add 'rest_framework_simplejwt.token_blacklist'
-    # to INSTALLED_APPS) in production to fully revoke old refresh tokens.
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": False,
 
