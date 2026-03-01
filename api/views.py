@@ -1,20 +1,3 @@
-"""
-api/views.py
-------------
-API ViewSets for the Task Management API — Part 4.
-
-ViewSets:
-  - CategoryViewSet: Full CRUD for user-owned categories.
-  - TaskViewSet:     Full CRUD for tasks + a dedicated `toggle` action.
-
-Key design decisions:
-  - get_queryset() always filters by request.user — guarantees isolation.
-  - perform_create() injects request.user automatically.
-  - Filtering / search / ordering are declared per-viewset using DRF backends.
-  - The toggle action replaces the old TaskToggleCompleteView while keeping
-    identical business logic.
-"""
-
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, generics, status, viewsets
 from rest_framework.decorators import action
@@ -25,9 +8,8 @@ from .models import Category, Task
 from .serializers import CategorySerializer, TaskSerializer, UserRegisterSerializer
 
 
-# ---------------------------------------------------------------------------
+
 # Category ViewSet
-# ---------------------------------------------------------------------------
 
 class CategoryViewSet(viewsets.ModelViewSet):
     """
@@ -59,9 +41,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
 
-# ---------------------------------------------------------------------------
 # Task ViewSet
-# ---------------------------------------------------------------------------
 
 class TaskViewSet(viewsets.ModelViewSet):
     """
@@ -79,19 +59,14 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
 
-    # -----------------------------------------------------------------------
     # Filter / search / ordering backends
-    # -----------------------------------------------------------------------
+
     filter_backends = [
         DjangoFilterBackend,
         filters.SearchFilter,
         filters.OrderingFilter,
     ]
 
-    # Exact-match filters on these fields:
-    #   /api/tasks/?priority=HIGH
-    #   /api/tasks/?status=PENDING
-    #   /api/tasks/?due_date=2025-12-31
     filterset_fields = ["priority", "status", "due_date", "category"]
 
     # Full-text search across title and description:
@@ -104,9 +79,6 @@ class TaskViewSet(viewsets.ModelViewSet):
     ordering_fields = ["due_date", "priority", "created_at"]
     ordering = ["-created_at"]      # default ordering (newest first)
 
-    # -----------------------------------------------------------------------
-    # Queryset — always scoped to request.user
-    # -----------------------------------------------------------------------
 
     def get_queryset(self):
         """Return only the tasks belonging to the current user."""
@@ -115,10 +87,6 @@ class TaskViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Automatically assign the task to the current user."""
         serializer.save(user=self.request.user)
-
-    # -----------------------------------------------------------------------
-    # Custom action: toggle completion status
-    # -----------------------------------------------------------------------
 
     @action(detail=True, methods=["patch"], url_path="toggle")
     def toggle(self, request, pk=None):
@@ -147,9 +115,8 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-# ---------------------------------------------------------------------------
+
 # User Registration (public)
-# ---------------------------------------------------------------------------
 
 class RegisterView(generics.CreateAPIView):
     """
