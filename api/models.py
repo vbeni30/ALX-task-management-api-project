@@ -1,28 +1,9 @@
-"""
-api/models.py
--------------
-Defines the data models for the Task Management API — Part 4.
-
-Models:
-  - Category: A user-owned label that can be attached to tasks.
-  - Task:     The core entity, now with an optional FK to Category.
-
-Design decisions:
-  - Category.user and Task.user are always set from request.user in the view
-    (never accepted from the client) to guarantee isolation.
-  - Task.category is nullable so existing tasks need no migration data.
-  - completed_at is set/cleared by mark_complete/mark_incomplete helpers to
-    keep that logic in one place.
-"""
-
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 
-# ---------------------------------------------------------------------------
 # Category
-# ---------------------------------------------------------------------------
 
 class Category(models.Model):
     """A user-defined label that can be applied to tasks."""
@@ -49,31 +30,23 @@ class Category(models.Model):
         verbose_name_plural = "categories"
 
 
-# ---------------------------------------------------------------------------
 # Task
-# ---------------------------------------------------------------------------
 
 class Task(models.Model):
     """Represents a single task owned by a user."""
 
-    # -----------------------------------------------------------------------
     # Priority choices
-    # -----------------------------------------------------------------------
     class Priority(models.TextChoices):
         LOW = "LOW", "Low"
         MEDIUM = "MEDIUM", "Medium"
         HIGH = "HIGH", "High"
 
-    # -----------------------------------------------------------------------
     # Status choices
-    # -----------------------------------------------------------------------
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
         COMPLETED = "COMPLETED", "Completed"
 
-    # -----------------------------------------------------------------------
     # Fields
-    # -----------------------------------------------------------------------
 
     # The user who owns this task.
     # on_delete=CASCADE: if a user is deleted, their tasks are also deleted.
@@ -102,7 +75,7 @@ class Task(models.Model):
     priority = models.CharField(
         max_length=10,
         choices=Priority.choices,
-        default=Priority.MEDIUM,        # sensible default
+        default=Priority.MEDIUM,       
     )
 
     status = models.CharField(
@@ -118,9 +91,7 @@ class Task(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # -----------------------------------------------------------------------
     # Methods
-    # -----------------------------------------------------------------------
 
     def mark_complete(self):
         """Mark this task as COMPLETED and record the timestamp."""
