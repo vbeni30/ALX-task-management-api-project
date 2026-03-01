@@ -1,30 +1,11 @@
-"""
-api/serializers.py
-------------------
-Serializers for the Task Management API.
-
-Serializers:
-  - CategorySerializer: CRUD for user-owned categories.
-  - TaskSerializer:     Full task representation with optional category.
-
-Security notes:
-  - `user` is always a read-only field derived from `request.user` in the
-    viewset's `perform_create()`. Clients cannot spoof ownership.
-  - `validate_category` enforces that a task can only be assigned a category
-    that belongs to the requesting user — preventing cross-user data leakage.
-  - `completed_at` is read-only and is only modified through the `toggle`
-    action on the viewset, which delegates to model helpers.
-"""
-
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Category, Task
 
 
-# ---------------------------------------------------------------------------
 # Category
-# ---------------------------------------------------------------------------
+
 
 class CategorySerializer(serializers.ModelSerializer):
     """
@@ -60,9 +41,8 @@ class CategorySerializer(serializers.ModelSerializer):
         return value
 
 
-# ---------------------------------------------------------------------------
+
 # Task
-# ---------------------------------------------------------------------------
 
 class TaskSerializer(serializers.ModelSerializer):
     """
@@ -125,9 +105,7 @@ class TaskSerializer(serializers.ModelSerializer):
         return value
 
 
-# ---------------------------------------------------------------------------
 # User Registration
-# ---------------------------------------------------------------------------
 
 class UserRegisterSerializer(serializers.Serializer):
     """Serializer for new user registration (public endpoint)."""
