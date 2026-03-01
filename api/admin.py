@@ -13,9 +13,8 @@ from django.contrib import admin
 from .models import Category, Task
 
 
-# ---------------------------------------------------------------------------
+
 # Category Admin
-# ---------------------------------------------------------------------------
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -28,9 +27,7 @@ class CategoryAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
 
 
-# ---------------------------------------------------------------------------
 # Task Admin
-# ---------------------------------------------------------------------------
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
