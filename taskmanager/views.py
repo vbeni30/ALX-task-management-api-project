@@ -1,10 +1,3 @@
-"""
-taskmanager/views.py
---------------------
-Minimal Django views that serve the frontend HTML templates.
-All business logic lives in JavaScript that talks to /api/ endpoints.
-"""
-
 from django.views.generic import TemplateView
 
 
